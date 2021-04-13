@@ -1,20 +1,19 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace AspNet_AuthCookies.Contollers
 {
-    [Authorize]
     public class HomeController : Controller
     {
-        [AllowAnonymous]
+        [Authorize(Roles = "admin, user")]
         public IActionResult Index()
         {
-            if (HttpContext.User.Identity.IsAuthenticated)
-                return View("Index" ,User.Identity.Name);
-            else
-                return View("Index", "not authorized");
+            string role = User.FindFirst(claim => claim.Type == ClaimsIdentity.DefaultRoleClaimType).Value;
+            return View("Index" ,$"User: {User.Identity.Name}. Role: {role}");
         }
 
+        [Authorize(Roles = "admin")]
         public IActionResult About()
         {
             return Content("About", "Authorized");

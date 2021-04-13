@@ -29,10 +29,12 @@ namespace AspNet_AuthCookies.Contollers
         {
             if(ModelState.IsValid)
             {
-                User user = await db.Users.FirstOrDefaultAsync(u => u.Email == loginViewModel.Email && u.Password == loginViewModel.Password);
+                User user = await db.Users
+                                    .Include(u => u.Role)
+                                    .FirstOrDefaultAsync(u => u.Email == loginViewModel.Email && u.Password == loginViewModel.Password);
                 if(user != null)
                 {
-                    await Authenticate(loginViewModel.Email);
+                    await Authenticate(user);
                     return RedirectToAction("Index", "Home");
                 }
                 ModelState.AddModelError("", "Некорректный логин или пароль");
@@ -51,13 +53,20 @@ namespace AspNet_AuthCookies.Contollers
             if (ModelState.IsValid)
             {
                 User user = await db.Users.FirstOrDefaultAsync(u => u.Email == model.Email);
+                Role userRole = await db.Roles.FirstOrDefaultAsync(r => r.Name == "user");
+
                 if (user == null)
                 {
+                    user = new User { Email = model.Email, Password = model.Password };
+
+                    if (userRole != null)
+                        user.Role = userRole;
+
                     // добавляем пользователя в бд
-                    db.Users.Add(new User { Email = model.Email, Password = model.Password });
+                    db.Users.Add(user);
                     await db.SaveChangesAsync();
 
-                    await Authenticate(model.Email); // аутентификация
+                    await Authenticate(user); // аутентификация
 
                     return RedirectToAction("Index", "Home");
                 }
@@ -67,12 +76,13 @@ namespace AspNet_AuthCookies.Contollers
             return View(model);
         }
 
-        private async Task Authenticate(string userName)
+        private async Task Authenticate(User user)
         {
             // создаем один claim
             var claims = new List<Claim>
             {
-                new Claim(ClaimsIdentity.DefaultNameClaimType, userName)
+                new Claim(ClaimsIdentity.DefaultNameClaimType, user.Email),
+                new Claim(ClaimsIdentity.DefaultRoleClaimType, user.Role?.Name)
             };
             // создаем объект ClaimsIdentity
             ClaimsIdentity id = new ClaimsIdentity(claims, "ApplicationCookie", ClaimsIdentity.DefaultNameClaimType, ClaimsIdentity.DefaultRoleClaimType);
